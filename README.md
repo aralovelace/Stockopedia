@@ -1,119 +1,63 @@
-# Stockopedia Interview Project
+# Stockopedia Take-Home — JSON DSL Interpreter
 
-The goal of the project is to build a small interpreter for a JSON-based DSL that performs some simple analytics on a
-data set.
+A small interpreter for a JSON-based DSL that evaluates arithmetic expressions over a fixed set of
+securities, attributes and facts.
 
-We have included basic UI boilerplate in this project to help you get started quickly. This way, you can focus your 
-attention on implementing the application logic. We expect you to spend a few hours on this project, but don't worry if 
-you don't finish everything within that timeframe. Please let us know which areas you weren't able to complete and how 
-you plan to finish them if given more time.
+## A note on AI use, up front
 
-## Requirements
+I want to be upfront: I used a lot of AI help on this challenge.
 
-- The example expressions are correctly interpreted and give the correct result
-- Syntactically invalid DSLs are handled and the user made aware (i.e. malformed JSON)
-- Syntactically valid DSLs which do not adhere to the schema are handled the user made aware
-- Valid DSL expressions that fail on either attribute or security look-up are handled and the user made aware
+I struggled at first to understand how the interpreter was meant to work, so I asked an AI
+assistant to explain it to me. Once that clicked I worked on the implementation, but I leaned on
+AI heavily throughout — both to understand the problem and to get to the solution. I also asked an
+AI agent to write the tests, because I wasn't confident my implementation was correct and I wanted
+something that would tell me whether it worked.
 
-## The Data
+I'd rather you know that than guess at it. I'm happy to talk through any part of the code.
 
-The data set comprises 3 small csv files, `securities.json`,
-`attributes.json` and `facts.json`. There are 10 securities and 10 attributes, and for each
-security and each attribute, there is one fact. I.e. there is a one-to-many relationship between
-securities and facts, and attributes and facts. These are located in the `data` directory in the root of then project.
+## What was built
 
-### Securities Schema
+Two new files hold the whole implementation:
 
-```typescript
-export interface Security {
-  id: number;
-  symbol: string;
-}
+- **`lib/dsl/interpreter.ts`** — parses the input text, validates it against the DSL schema, resolves
+  the security, and recursively evaluates the expression tree. Returns a discriminated union,
+  `Result = { ok: true; value: number } | { ok: false; error: string }`, so every failure is a value
+  rather than an exception.
+- **`lib/dsl/operators.ts`** — the four arithmetic operators (`+`, `-`, `*`, `/`) as a lookup table.
+  This doubles as the validator for `fn`: an operator is valid precisely because it's a key here.
+
+`app/page.tsx` was then wired up to call `runQuery` and render either the value or the error message.
+
+All four stated requirements are covered:
+
+| Requirement | Where it's handled |
+| --- | --- |
+| Example expressions give the correct result | `evaluate` in `interpreter.ts` (verified as 8, 0.5 and -21) |
+| Malformed JSON is reported | `parseJson` returns `undefined` → `"Invalid JSON."` |
+| Schema-valid-JSON-but-invalid-DSL is reported | `isQuery` / `isExpression` / `isArgument` → `"Invalid. Expected …"` |
+| Security and attribute lookup failures are reported | `"Security \"ZZZ\" not found."` / `"Attribute \"banana\" not found."`, plus `"No value for \"shares\" on this security."` when the fact is missing |
+
+## What the AI actually did
+
+Being specific, since this is the part I'd want to know if I were reading someone else's submission:
+
+- **Explaining the problem.** Before writing anything, I had the DSL and the data model explained to
+  me until I understood what "one fact per security per attribute" meant and how a nested expression
+  should fold down to a single number. This was most of the value I got from AI.
+- **Shaping the implementation.**  I have AI helped me what the solution would look like until I get it
+- **Writing all the tests.** Every test here was AI-written: `lib/dsl/interpreter.spec.ts` from
+  scratch, and `app/page.spec.tsx`, where the boilerplate left an `xit` stub marked
+  `// TODO: Complete this test suite once implementation is complete`. I read them and they look
+  reasonable to me, but I didn't write them, just to make sure I did the solution correctly.
+## Running it
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npx jest         # 20 tests, 2 suites — all passing
+npx tsc --noEmit # clean
 ```
 
-### Attributes Schema
-
-```typescript
-export interface Attribute {
-  id: number;
-  name: string;
-}
-```
-
-### Facts Schema
-
-```typescript
-export interface Fact {
-  securityId: number;
-  attributeId: number;
-  value: number;
-}
-```
-
-## The DSL
-
-A query in our DSL has the basic format:
-
-```json
-{
-  "security": <String>,
-  "expression": <Expression>
-}
-```
-
-The security property contains a single string, which is the symbol of a security the user wishes
-to evaluate an expression for.
-
-The expression field contains a single expression, which the user wishes to evaluate for the
-chosen security. An expression contains an operator (the `fn` property), and the arguments to
-that operator has other properties. The arguments to operators can either be the name of an
-attribute, a number, or another expression.
-
-You only have to implement one operator, though it should be clear in your solution
-how it might be possible to extend the interpreter to include additional operators. Please choose
-one of the following operators to implement:
-
-| Operator | Arguments | Behaviour          |
-| -------- | --------- | ------------------ |
-| +        | a, b      | Adds a and b       |
-| -        | a, b      | Subtracts b from a |
-| \*       | a, b      | Multiplies a and b |
-| /        | a, b      | Divides a by b     |
-
-Here are some example queries, demonstrating what each operator looks like and what the different
-parameters can be:
-
-This one uses the `*` operator and makes use of one attribute name and an integer as its arguments:
-
-```json
-{
-  "expression": { "fn": "*", "a": "sales", "b": 2 },
-  "security": "ABC"
-}
-```
-
-This one uses the `/` operator and makes uses two attribute names as arguments:
-
-```json
-{
-  "expression": { "fn": "/", "a": "price", "b": "eps" },
-  "security": "BCD"
-}
-```
-
-This one uses the `-` operator and the arguments are two expressions, which in turn use the `-`
-operator and attribute names as arguments:
-
-```json
-{
-  "expression": {
-    "fn": "-",
-    "a": { "fn": "-", "a": "eps", "b": "shares" },
-    "b": { "fn": "-", "a": "assets", "b": "liabilities" }
-  },
-  "security": "CDE"
-}
-```
 
 ## Developing
 
