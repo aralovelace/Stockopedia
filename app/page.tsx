@@ -2,6 +2,8 @@
 
 import { ChangeEvent, FunctionComponent, useState } from "react";
 
+import { Result, runQuery } from "../lib/dsl/interpreter";
+
 import styles from "./page.module.css";
 
 interface DSLExample {
@@ -67,7 +69,10 @@ const examples: readonly DSLExample[] = [
 
 const Home: FunctionComponent = () => {
   const [expression, setExpression] = useState<string>(examples[0].dsl);
+  const [result, setResult] = useState<Result | null>(null);
+
   const setDsl = (dsl: string) => () => setExpression(dsl);
+  const run = () => setResult(runQuery(expression));
 
   return (
     <main className={styles.container}>
@@ -116,13 +121,25 @@ const Home: FunctionComponent = () => {
           }
           rows={8}
         ></textarea>
-        <div className={[styles.message, styles.messageSuccess].join(" ")}>
-          DSL query ran successfully!
-        </div>
-        <div className={[styles.message, styles.messageError].join(" ")}>
-          There is a problem with your DSL query.
-        </div>
-        <button data-testid="run-button" type="button">
+        {result?.ok && (
+          <div
+            className={[styles.message, styles.messageSuccess].join(" ")}
+            data-testid="success-message"
+            role="status"
+          >
+            DSL query ran successfully!
+          </div>
+        )}
+        {result && !result.ok && (
+          <div
+            className={[styles.message, styles.messageError].join(" ")}
+            data-testid="error-message"
+            role="alert"
+          >
+            There is a problem with your DSL query: {result.error}
+          </div>
+        )}
+        <button data-testid="run-button" type="button" onClick={run}>
           Run
         </button>
       </div>
@@ -133,8 +150,10 @@ const Home: FunctionComponent = () => {
         <textarea
           id="dsl-output"
           className={styles.field}
+          data-testid="output"
           readOnly
           rows={1}
+          value={result?.ok ? String(result.value) : ""}
         ></textarea>
       </div>
     </main>
